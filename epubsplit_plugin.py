@@ -130,13 +130,13 @@ class EpubSplitPlugin(InterfaceAction):
 
                 if db.has_format(source_id,'EPUB',index_is_id=True):
                     splitepub = SplitEpub(BytesIO(db.format(source_id,'EPUB',index_is_id=True)))
-                    from calibre.ebooks.oeb.polish.container import get_container
-                    container = get_container(db.format_abspath(source_id,'EPUB',index_is_id=True))
-                    if container.opf_version_parsed.major >= 3:
-                        d = error_dialog(self.gui, _('EPUB3 Detected'),
-                                         _('This plugin only works on EPUB2 format ebooks.'))
-                        d.exec_()
-                        return
+                    # from calibre.ebooks.oeb.polish.container import get_container
+                    # container = get_container(db.format_abspath(source_id,'EPUB',index_is_id=True))
+                    # if container.opf_version_parsed.major >= 3:
+                        # d = error_dialog(self.gui, _('EPUB3 Detected'),
+                                         # _('This plugin only works on EPUB2 format ebooks.'))
+                        # d.exec_()
+                        # return
                 else:
                     d = error_dialog(self.gui, _('No EPUB'),
                                      _('This plugin only works on EPUB format ebooks.'))
