@@ -60,47 +60,36 @@ $xPlaceholder = if ($xMatch.Success) { $xMatch.Value } else { $null }
 $yPlaceholder = if ($yMatch.Success) { $yMatch.Value } else { $null }
 
 # Chapter detection patterns (same defaults as ebooks.zsh esP1/esP2, overridable via env vars)
-$pToc  = if ($env:esP1) { $env:esP1 } else { "toc:\s+\['\D*(\d+)" }
+# Updated to match both single and double quotes for toc entries
+$pToc  = if ($env:esP1) { $env:esP1 } else { "toc:\s+\[.{0,1}.*?(\d+)" }
 $pIdPat = if ($env:esP2) { $env:esP2 } else { "id:\s+[cC]\D*(\d+)" }
 
 Write-Host "Listing split points in: $EpubFile"
 $epubOutput = python $EpubSplitPy $EpubFile
 
 # Parse chapter entries: collect (Line, Chap) per unique chapter boundary.
-# Logic mirrors ebooks.zsh: lm1/lm2 always updated, but only first change per
-# Line Number entry is recorded (alreadyNoticed gate).
-$chapters       = @()
-$currentLine    = $null
-$alreadyNoticed = $false
-$lm1            = $null
-$lm2            = $null
-
+# Note: The Line Numbers in epubsplit.py output are consistently off by +1 from chapter numbers.
+# We track chapter numbers and will add 1 when passing to epubsplit.py.
+$chapters = @()
 foreach ($line in $epubOutput) {
-    if ($line -match '^\s*Line Number:\s+(\d+)') {
-        $currentLine    = [int]$Matches[1]
-        $alreadyNoticed = $false
-        continue
-    }
-    if ($null -eq $currentLine) { continue }
-
     if ($line -match $pToc) {
         $num = [int]$Matches[1]
-        if ($num -ne $lm1 -and -not $alreadyNoticed) {
-            $chapters      += [PSCustomObject]@{ Line = $currentLine; Chap = $num }
-            $alreadyNoticed = $true
+        if ($num -ne $lm1) {
+            $chapters += [PSCustomObject]@{ Chap = $num }
         }
         $lm1 = $num
     }
 
     if ($line -match $pIdPat) {
         $num = [int]$Matches[1]
-        if ($num -ne $lm2 -and -not $alreadyNoticed) {
-            $chapters      += [PSCustomObject]@{ Line = $currentLine; Chap = $num }
-            $alreadyNoticed = $true
+        if ($num -ne $lm2) {
+            $chapters += [PSCustomObject]@{ Chap = $num }
         }
         $lm2 = $num
     }
 }
+
+$chapters = $chapters | Sort-Object -Property Chap -Unique
 
 Write-Host "Found $($chapters.Count) chapter entries."
 
@@ -140,7 +129,8 @@ for ($i = 0; $i -lt $total; $i += $ChaptersPerSplit) {
     if ($yPlaceholder) { $titleStr = $titleStr.Replace($yPlaceholder, $yStr) }
 
     $outputFile = "$titleStr.epub"
-    $lineNums   = $chunk | ForEach-Object { "$($_.Line)" }
+    # Add 1 to chapter numbers to get the correct Line Numbers for epubsplit.py
+    $lineNums   = $chunk | ForEach-Object { "$($_.Chap + 1)" }
 
     Write-Host "Creating: $outputFile  (chapters $firstChap-$lastChap, $($chunk.Count) sections)"
     python $EpubSplitPy --title $titleStr -o $outputFile $EpubFile @lineNums
